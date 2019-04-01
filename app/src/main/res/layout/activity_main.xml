@@ -49,9 +49,26 @@
         app:layout_constraintVertical_bias="0.212" />
 
     <Space
+        android:id="@+id/space"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         tools:layout_editor_absoluteX="195dp"
         tools:layout_editor_absoluteY="11dp" />
+
+    <Button
+        android:id="@+id/armBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="8dp"
+        android:enabled="false"
+        android:text="Armed"
+        android:visibility="visible"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@+id/barrier"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/space" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
