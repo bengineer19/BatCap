@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">BatCap</string>
+    <string name="pref_file_name">globalPrefs</string>
 </resources>
