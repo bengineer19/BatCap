@@ -9,7 +9,11 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Handler;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraManager;
+import android.os.BatteryManager;
 import android.os.IBinder;
 import android.util.Log;
 import android.widget.Toast;
@@ -18,40 +22,82 @@ import androidx.core.app.NotificationCompat;
 
 public class BattCheckerService extends IntentService {
 
+    private int resetHysteresisPct = 5;
+    private int checkDelayMillis = 1000;
+
     public BattCheckerService() {
         super("BattCheckerService");
     }
 
-    Handler timerHandler = new Handler();
-    private Runnable timerRunnable = new Runnable() {
-        @Override
-        public void run() {
-            // Do the thing
-            Log.d("action", "Been timed innit");
-
-            timerHandler.postDelayed(this, 1500);
-        }
-    };
 
     @Override
     protected void onHandleIntent(Intent intent) {
         Log.d("Service", "Handling intent");
 
         startMyOwnForeground();
-        try {
-            Thread.sleep(1000);
-//            Thread.sleep(10000);
-        } catch (InterruptedException e) {
-        }
 
         try {
             while (true) {
-                Thread.sleep(1000);
-                Log.d("action", "OK lol");
+                Thread.sleep(checkDelayMillis);
+//                Log.d("action", "Checking Battery...");
+                checkBatt();
             }
         }catch (InterruptedException e) {}
 
-        timerHandler.postDelayed(timerRunnable, 0);
+    }
+
+    private void checkBatt(){
+        Intent intent = this.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+
+//        Log.d("batt", "Percent:  " + String.valueOf(level));
+
+        SharedPreferences sharedPref = getSharedPrefs();
+        int cutoffLevel = sharedPref.getInt("cutoffLevel", 802);
+//        Log.d("batt", "cutoffLevel:  " + String.valueOf(cutoffLevel));
+
+        boolean enabled = sharedPref.getBoolean("enabled", true);
+        boolean cutoffArmed = sharedPref.getBoolean("cutoffArmed", true);
+
+        if (level >= cutoffLevel
+                && status == BatteryManager.BATTERY_STATUS_CHARGING
+                && enabled
+                && cutoffArmed) {
+
+            Log.d("action", "Flashing light");
+            // LightFlasher currently failing :( Probs a thread/handler thing
+            LightFlasher.flashLight(this);
+            CameraManager cameraManager = (CameraManager) this.getSystemService(Context.CAMERA_SERVICE);
+
+            try {
+                String cameraId = cameraManager.getCameraIdList()[0];
+                cameraManager.setTorchMode(cameraId, true);
+            } catch (CameraAccessException e) {
+            }
+
+
+
+            Log.d("arming", "DISARMING cutoff");
+            SharedPreferences.Editor prefEditor = sharedPref.edit();
+            prefEditor.putBoolean("cutoffArmed", false);
+            prefEditor.commit();
+
+            stopForeground(true);
+            stopSelf();
+        }
+
+        else if (level < (cutoffLevel - resetHysteresisPct) && !cutoffArmed) {
+            Log.d("arming", "ARMING cutoff");
+            SharedPreferences.Editor prefEditor = sharedPref.edit();
+            prefEditor.putBoolean("cutoffArmed", true);
+            prefEditor.commit();
+        }
+    }
+
+    private SharedPreferences getSharedPrefs(){
+        return getApplicationContext().getSharedPreferences(getString(R.string.pref_file_name),
+                Context.MODE_PRIVATE);
     }
 
     private void startMyOwnForeground(){
@@ -62,7 +108,7 @@ public class BattCheckerService extends IntentService {
         NotificationCompat.Builder notificationBuilder =
                 getNotifBuilder(this, "BatCap.Checker", NotificationManager.IMPORTANCE_LOW);
         Notification notification = notificationBuilder.setOngoing(true)
-                .setSmallIcon(R.drawable.tick)
+                .setSmallIcon(R.drawable.ic_batt_charging)
                 .setContentTitle("BatCap")
                 .setContentText("Monitoring Battery level")
                 .setContentIntent(pendingIntent)
@@ -107,6 +153,6 @@ public class BattCheckerService extends IntentService {
 
     @Override
     public void onDestroy() {
-        Toast.makeText(this, "BattCheckerService done", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "BattCheckerService exiting", Toast.LENGTH_SHORT).show();
     }
 }
