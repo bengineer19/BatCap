@@ -24,6 +24,7 @@ public class BattCheckerService extends IntentService {
 
     private int resetHysteresisPct = 5;
     private int checkDelayMillis = 1000;
+    private int flashDurationMillis= 500;
 
     public BattCheckerService() {
         super("BattCheckerService");
@@ -66,17 +67,7 @@ public class BattCheckerService extends IntentService {
                 && cutoffArmed) {
 
             Log.d("action", "Flashing light");
-            // LightFlasher currently failing :( Probs a thread/handler thing
-            LightFlasher.flashLight(this);
-            CameraManager cameraManager = (CameraManager) this.getSystemService(Context.CAMERA_SERVICE);
-
-            try {
-                String cameraId = cameraManager.getCameraIdList()[0];
-                cameraManager.setTorchMode(cameraId, true);
-            } catch (CameraAccessException e) {
-            }
-
-
+            flash();
 
             Log.d("arming", "DISARMING cutoff");
             SharedPreferences.Editor prefEditor = sharedPref.edit();
@@ -142,6 +133,37 @@ public class BattCheckerService extends IntentService {
                 nChannel.setDescription(description);
                 nm.createNotificationChannel(nChannel);
             }
+        }
+    }
+
+    private void flash(){
+        try {
+            for (int i = 0; i < 3; i++) {
+                torchOn();
+                Thread.sleep(flashDurationMillis);
+                torchOff();
+                Thread.sleep(flashDurationMillis);
+            }
+        }catch (InterruptedException e) {}
+    }
+
+    private void torchOn() {
+        CameraManager cameraManager = (CameraManager) this.getSystemService(Context.CAMERA_SERVICE);
+
+        try {
+            String cameraId = cameraManager.getCameraIdList()[0];
+            cameraManager.setTorchMode(cameraId, true);
+        } catch (CameraAccessException e) {
+        }
+    }
+
+    private void torchOff() {
+        CameraManager cameraManager = (CameraManager) this.getSystemService(Context.CAMERA_SERVICE);
+
+        try {
+            String cameraId = cameraManager.getCameraIdList()[0];
+            cameraManager.setTorchMode(cameraId, false);
+        } catch (CameraAccessException e) {
         }
     }
 
