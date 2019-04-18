@@ -1,6 +1,7 @@
 package com.example.batcap;
 
 import android.Manifest;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -60,16 +61,27 @@ public class MainActivity extends AppCompatActivity {
     SharedPreferences.OnSharedPreferenceChangeListener listener = new
 SharedPreferences.OnSharedPreferenceChangeListener() {
         public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
-            if (key.equals("cutoffArmed")) {
-                if(prefs.getBoolean("cutoffArmed", true)){
-                    armCutoff();
-                }
-                else {
-                    disarmCutoff();
-                }
+        if (key.equals("cutoffArmed")) {
+            if(prefs.getBoolean("cutoffArmed", true)){
+                armCutoff();
+            }
+            else {
+                disarmCutoff();
             }
         }
+        }
     };
+
+    @SuppressWarnings("deprecation")
+    private boolean serviceRunning(Class<?> serviceClass) {
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (serviceClass.getName().equals(service.service.getClassName())) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private SharedPreferences getSharedPrefs(){
         return getApplicationContext().getSharedPreferences(getString(R.string.pref_file_name),
@@ -77,11 +89,17 @@ SharedPreferences.OnSharedPreferenceChangeListener() {
     }
 
     private void startBattCheckerService(){
-        // Start background service which watches the battery level
-        Intent intent = new Intent(this, BattCheckerService.class);
-        startService(intent);
-        Toast.makeText(getApplication(), "Starting monitoring service",
-                Toast.LENGTH_LONG).show();
+        if( ! serviceRunning(BattCheckerService.class)){
+            // Start background service which watches the battery level
+            Intent intent = new Intent(this, BattCheckerService.class);
+            startService(intent);
+            Toast.makeText(getApplication(), "Starting monitoring service",
+                    Toast.LENGTH_LONG).show();
+        }
+        else {
+            Log.d("Service","Service already running, not launching another");
+        }
+
     }
 
     private void armCutoff() {
@@ -164,7 +182,7 @@ SharedPreferences.OnSharedPreferenceChangeListener() {
                 SharedPreferences.Editor prefEditor = sharedPref.edit();
                 prefEditor.putBoolean("enabled", isChecked);
                 prefEditor.commit();
-                if(cutoffArmed){
+                if(cutoffArmed && isChecked){
                     startBattCheckerService();
                 }
             }
